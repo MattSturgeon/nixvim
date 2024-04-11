@@ -67,4 +67,10 @@
     githubId = 67534814;
     name = "Ben";
   };
+  NathanFelber = {
+    email = "nathan@pascaline.org";
+    github = "nfelber";
+    githubId = 46248772;
+    name = "Nathan Felber";
+  };
 }
