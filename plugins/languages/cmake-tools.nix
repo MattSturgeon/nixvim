@@ -30,63 +30,71 @@ helpers.neovim-plugin.mkNeovimPlugin config {
       Auto generate when save CMakeLists.txt.
     '';
 
-    cmake_generate_options =
-      helpers.defaultNullOpts.mkAttributeSet
-        ''
-          { "-DCMAKE_EXPORT_COMPILE_COMMANDS" = 1; }
-        ''
-        ''
+    cmake_generate_options = helpers.defaultNullOpts.mkListOf lib.types.str [ "-DCMAKE_EXPORT_COMPILE_COMMANDS=1" ] ''
           This will be passed when invoke `CMakeGenerate`.
         '';
 
-    cmake_build_options = helpers.defaultNullOpts.mkAttributeSet "{}" ''
+    cmake_build_options = helpers.defaultNullOpts.mkAttributeSet {} ''
       This will be passed when invoke `CMakeBuild`.
     '';
 
-    cmake_build_directory = helpers.defaultNullOpts.mkStr "out/\${variant:buildType}" ''
-      This is used to specify generate directory for cmake, allows macro expansion, relative to vim.loop.cwd().
-    '';
+    cmake_build_directory = helpers.defaultNullOpts.mkStr' {
+      default.__raw = ''
+        function()
+          if osys.iswin32 then
+            return "out\\''${variant:buildType}"
+          end
+          return "out/''${variant:buildType}"
+        end
+      '';
+
+      example = "out/\${variant:buildType}";
+
+      description = ''
+        This is used to specify generate directory for cmake, allows macro expansion, relative to vim.loop.cwd().
+
+        Support macro expansion:
+        - `''${kit}`
+        - `''${kitGenerator}`
+        - `''${variant:xx}`
+
+        Can be a string or a function returning a string.
+      '';
+    };
 
     cmake_soft_link_compile_commands = helpers.defaultNullOpts.mkBool true ''
       This will automatically make a soft link from compile commands file to project root dir.
     '';
 
     cmake_compile_commands_from_lsp = helpers.defaultNullOpts.mkBool false ''
-      This will automatically set compile commands file location using lsp, to use it, please set `cmake_soft_link_compile_commands` to false.
+      This will automatically set compile commands file location using lsp.
+
+      To use this option, please set `cmake_soft_link_compile_commands` to false.
     '';
 
     cmake_kits_path = helpers.defaultNullOpts.mkStr null ''
-      This is used to specify global cmake kits path, see CMakeKits for detailed usage.
+      This is used to specify global cmake kits path, see `CMakeKits` for detailed usage.
     '';
 
-    cmake_variants_message =
-      helpers.mkCompositeOption
-        ''
-          Settings for cmake variants messages.
-        ''
-        {
-          short =
-            helpers.defaultNullOpts.mkAttributeSet
-              ''
-                { show = true; }
-              ''
-              ''
-                Whether to show short message.
-              '';
+    # FIXME attrs vs attrsOf anything?
+    cmake_variants_message = {
+      short =
+        helpers.defaultNullOpts.mkAttributeSet
+            { show = true; }
+          ''
+            Whether to show short message.
+          '';
 
-          long =
-            helpers.defaultNullOpts.mkAttributeSet
-              ''
-                { show = true; max_length = 40; }
-              ''
-              ''
-                Whether to show long message.
-              '';
-        };
+      long =
+        helpers.defaultNullOpts.mkAttributeSet
+            { show = true; max_length = 40; }
+          ''
+            Whether to show long message.
+          '';
+    };
 
     cmake_dap_configuration =
       helpers.defaultNullOpts.mkAttributeSet
-        ''
           {
             name = "cpp";
             type = "codelldb";
@@ -96,27 +104,20 @@ helpers.neovim-plugin.mkNeovimPlugin config {
             console = "integratedTerminal";
           }
         ''
-        ''
           Dap configuration for cmake.
         '';
 
-    cmake_executor =
-      helpers.mkCompositeOption
-        ''
-          Executor to use.
-        ''
-        {
+    cmake_executor = {
           name = helpers.defaultNullOpts.mkStr "quickfix" ''
-            Name of the executor.
+            Name of the executor to use.
           '';
 
-          opts = helpers.defaultNullOpts.mkAttributeSet "{}" ''
+          opts = helpers.defaultNullOpts.mkAttributeSet {} ''
             The options the executor will get, possible values depend on the executor type. See `default_opts` for possible values.
           '';
 
           default_opts =
             helpers.defaultNullOpts.mkAttributeSet
-              ''
                 {
                   quickfix = {
                     show = "always"; # "always", "only_on_error"
@@ -134,16 +135,20 @@ helpers.neovim-plugin.mkNeovimPlugin config {
 
                   overseer = {
                     new_task_opts = {
-                      strategy.__raw = '''
-                        {
-                          "terminal",
-                        },
-                      '''';
+                      strategy = {
+                          "__unkeyed.1" = "terminal";
+                          direction = "horizontal";
+                          autos_croll = true;
+                          quit_on_exit = "success";
+                        };
                     }; # options to pass into the `overseer.new_task` command
-                    on_new_task = {
-                      __raw = '''
-                        function(task) end
-                      ''';
+                    on_new_task.__raw = ''
+                      function(task)
+                        require("overseer").open(
+                          { enter = false, direction = "right" }
+                        )
+                      end
+                    '';
                     }; # a function that gets overseer.Task when it is created, before calling `task:start`
                   };
 
@@ -163,7 +168,6 @@ helpers.neovim-plugin.mkNeovimPlugin config {
                     focus = false; # Focus on terminal when cmake task is launched.
                   }; # terminal executor uses the values in cmake_terminal
                 }
-              ''
               ''
                 A list of default and possible values for executors.
               '';
