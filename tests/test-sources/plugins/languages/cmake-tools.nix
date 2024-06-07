@@ -11,15 +11,19 @@
         cmake_command = "cmake";
         ctest_command = "ctest";
         cmake_regenerate_on_save = true;
-        cmake_generate_options = {"-DCMAKE_EXPORT_COMPILE_COMMANDS" = 1;};
-        cmake_build_options = {};
+        cmake_generate_options = {
+          "-DCMAKE_EXPORT_COMPILE_COMMANDS" = 1;
+        };
+        cmake_build_options = { };
         cmake_build_directory = "out/\${variant:buildType}";
         cmake_soft_link_compile_commands = true;
         cmake_compile_commands_from_lsp = false;
         cmake_kits_path = null;
 
         cmake_variants_message = {
-          short = {show = true;};
+          short = {
+            show = true;
+          };
           long = {
             show = true;
             max_length = 40;
@@ -37,7 +41,7 @@
 
         cmake_executor = {
           name = "quickfix";
-          opts = {};
+          opts = { };
           default_opts = {
             quickfix = {
               show = "always";
@@ -86,7 +90,7 @@
 
         cmake_runner = {
           name = "terminal";
-          opts = {};
+          opts = { };
           default_opts = {
             quickfix = {
               show = "always";
@@ -134,7 +138,18 @@
         cmake_notifications = {
           runner.enabled = true;
           executor.enabled = true;
-          spinner = ["⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"];
+          spinner = [
+            "⠋"
+            "⠙"
+            "⠹"
+            "⠸"
+            "⠼"
+            "⠴"
+            "⠦"
+            "⠧"
+            "⠇"
+            "⠏"
+          ];
           refresh_rate_ms = 100;
         };
       };
