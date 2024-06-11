@@ -35,20 +35,20 @@ pkgs.stdenv.mkDerivation {
   installPhase = ''
     function docgen {
       name=$1
-      baseName=$2
+      basename=$2
       description=$3
-      pwd
-      ls -a
-      ls -a ../lib
-      # TODO: wrap lib.$name in <literal>, make nixdoc not escape it
-      if [[ -e "../lib/$baseName.nix" ]]; then
-        echo "Found .nix file"
-        nixdoc -c "$name" -d "lib.$name: $description" -l ${locationsJSON} -f "$baseName.nix" > "$out/$name.md"
-      else
-        echo "Using default.nix file"
-        nixdoc -c "$name" -d "lib.$name: $description" -l ${locationsJSON} -f "$baseName/default.nix" > "$out/$name.md"
+      nixFile="../lib/$basename.nix"
+      if [ ! -e "$nixFile" ]; then
+        nixFile="../lib/$basename/default.nix"
       fi
-      echo "Writing $out/$name.md to $out/index.md"
+      echo "Opening $(realpath $nixFile) with ${locationsJSON}"
+      nixdoc \
+        --prefix "helpers" \
+        --category "$name" \
+        --description "${libName}.$name: $description" \
+        --locs ${locationsJSON} \
+        --file "$nixFile" \
+        > "$out/$name.md"
       echo "$out/$name.md" >> "$out/index.md"
     }
 
@@ -58,14 +58,15 @@ pkgs.stdenv.mkDerivation {
     ```{=include=} sections auto-id-prefix=auto-generated
     EOF
 
-    ${lib.strings.concatStrings (
+    ${lib.strings.concatStringsSep "\n" (
       lib.attrsets.mapAttrsToList (
-        # FIXME: the docgen function (above) allows name to be different to file's basename,
-        # but we use a simple {name:description} attrset for `libsets`...
-        name: description: ''
-          echo "About to run docgen for ${name}"
-          docgen ${name} ${name} ${lib.escapeShellArg description}
-        '') libsets
+        name: v:
+        let
+          basename = v.basename or name;
+          description = if builtins.isString v then v else v.description or "";
+        in
+        "docgen ${name} ${basename} ${lib.escapeShellArg description}"
+      ) libsets
     )}
 
     echo '```' >> "$out/index.md"

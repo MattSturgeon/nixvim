@@ -1,7 +1,16 @@
 {
-    "keymaps": "",
-    "autocmd": "",
+    "keymaps": {
+        "basename": "keymap-helpers",
+        "description": ""
+    },
+    "autocmd": {
+        "basename": "autocmd-helpers",
+        "description": ""
+    },
     "neovim-plugin": "",
     "vim-plugin": "",
-    "nixvimTypes": ""
+    "nixvimTypes": {
+        "basename": "types",
+        "description": ""
+    }
 }
