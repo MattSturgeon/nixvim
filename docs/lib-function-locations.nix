@@ -1,85 +1,96 @@
 {
-  pkgs,
-  nixpkgs ? { },
-  libsets,
+  pkgs ? import <nixpkgs> { },
+  lib ? pkgs.lib,
+  libName ? "helpers",
+  targetLib ? import ../lib/helpers.nix {
+    inherit pkgs lib;
+    _nixvimTests = false;
+  },
+  libsets ? lib.importJSON ./lib-function-sets.json,
+  # pathPrefix will be substituted for urlPrefix in links
+  pathPrefix ? ../.,
+  urlPrefix ? "https://github.com/nix-community/nixvim/blob/${revision}",
+  revision ? "main", # TODO
+  ...
 }:
+with builtins;
 let
-  revision = pkgs.lib.trivial.revisionWithDefault (nixpkgs.rev or "master");
 
   libDefPos =
     prefix: set:
-    builtins.concatMap (
+    concatMap (
       name:
       [
         {
-          name = builtins.concatStringsSep "." (prefix ++ [ name ]);
-          location = builtins.unsafeGetAttrPos name set;
+          name = concatStringsSep "." (prefix ++ [ name ]);
+          location = unsafeGetAttrPos name set;
         }
       ]
-      ++ nixpkgsLib.optionals (builtins.length prefix == 0 && builtins.isAttrs set.${name}) (
+      ++ lib.optionals (length prefix == 0 && isAttrs set.${name}) (
         libDefPos (prefix ++ [ name ]) set.${name}
       )
-    ) (builtins.attrNames set);
+    ) (attrNames set);
 
-  libset =
+  getLibset =
     toplib:
-    builtins.map (subsetname: {
-      inherit subsetname;
-      functions = libDefPos [ ] toplib.${subsetname};
-    }) (builtins.map (x: x.name) libsets);
+    lib.trivial.pipe libsets [
+      attrNames
+      (map (subset: {
+        inherit subset;
+        functions = libDefPos [ ] toplib.${subset};
+      }))
+    ];
 
-  nixpkgsLib = pkgs.lib;
-
-  flattenedLibSubset =
-    { subsetname, functions }:
-    builtins.map (fn: {
-      name = "lib.${subsetname}.${fn.name}";
-      value = fn.location;
+  getLibsetFns =
+    { subset, functions }:
+    map (fn: {
+      name = "${libName}.${subset}.${fn.name}";
+      loc = fn.location;
     }) functions;
 
-  locatedlibsets = libs: builtins.map flattenedLibSubset (libset libs);
   removeFilenamePrefix =
     prefix: filename:
     let
-      prefixLen = (builtins.stringLength prefix) + 1; # +1 to remove the leading /
-      filenameLen = builtins.stringLength filename;
-      substr = builtins.substring prefixLen filenameLen filename;
+      prefixLen = (stringLength prefix) + 1; # +1 to remove the leading /
+      filenameLen = stringLength filename;
+      substr = substring prefixLen filenameLen filename;
     in
     substr;
 
-  removeNixpkgs = removeFilenamePrefix (builtins.toString pkgs.path);
+  relativeLocs = lib.trivial.pipe targetLib [
+    getLibset
+    (map getLibsetFns)
+    lib.lists.flatten
+    (filter (elem: elem.loc != null))
+    (map (
+      { name, loc }:
+      {
+        inherit name;
+        loc = loc // {
+          # FIXME we want to remove helpers path prefix, not pkgs.path
+          # FIXME use lib.path.removePrefix or lib.string.removePrefix depending on whether value.file is a path
+          file = removeFilenamePrefix (toString pkgs.path) loc.file;
+        };
+      }
+    ))
+  ];
 
-  liblocations = builtins.filter (elem: elem.value != null) (
-    nixpkgsLib.lists.flatten (locatedlibsets nixpkgsLib)
-  );
+  sanitizeId = replaceStrings [ "'" ] [ "-prime" ];
 
-  fnLocationRelative =
-    { name, value }:
-    {
-      inherit name;
-      value = value // {
-        file = removeNixpkgs value.file;
-      };
-    };
-
-  relativeLocs = builtins.map fnLocationRelative liblocations;
-  sanitizeId = builtins.replaceStrings [ "'" ] [ "-prime" ];
-
-  urlPrefix = "https://github.com/NixOS/nixpkgs/blob/${revision}";
-  jsonLocs = builtins.listToAttrs (
-    builtins.map (
-      { name, value }:
+  jsonLocs = listToAttrs (
+    map (
+      { name, loc }:
       {
         name = sanitizeId name;
         value =
           let
-            text = "${value.file}:${builtins.toString value.line}";
-            target = "${urlPrefix}/${value.file}#L${builtins.toString value.line}";
+            text = "${loc.file}:${toString loc.line}";
+            url = "${urlPrefix}/${loc.file}#L${toString loc.line}";
           in
-          "[${text}](${target}) in `<nixpkgs>`";
+          "[${text}](${url}) in `<nixvim>`";
       }
     ) relativeLocs
   );
 
 in
-pkgs.writeText "locations.json" (builtins.toJSON jsonLocs)
+pkgs.writeText "locations.json" (toJSON jsonLocs)
