@@ -20,7 +20,7 @@
       [
         ../modules
         nixpkgsMaintainersList
-        nixvimExtraArgsModule
+        # nixvimExtraArgsModule
         (
           { lib, ... }:
           with lib;
