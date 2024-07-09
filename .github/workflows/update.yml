@@ -26,6 +26,9 @@ jobs:
           - selectedBranch: "nixos-24.05"
             branch: main
 
+    permissions:
+      contents: write
+
     name: Update the flake inputs and generate options
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -56,10 +59,6 @@ jobs:
         id: pr
         uses: peter-evans/create-pull-request@v6
         with:
-          # TODO: use an SSH deploy key instead
-          # See https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#triggering-further-workflow-runs
-          # and https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#push-using-ssh-deploy-keys
-          token: ${{ secrets.GH_TOKEN_FOR_UPDATES }}
           git-token: ${{ github.token }}
           branch: update/${{ matrix.branch }}
           base: ${{ matrix.branch }}
