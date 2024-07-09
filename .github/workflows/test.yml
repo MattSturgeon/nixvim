@@ -1,0 +1,12 @@
+name: test-workflow
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    name: Test workflow job
+    runs-on: ubuntu-latest
+    steps:
+      - name:
+        run: echo Hello
