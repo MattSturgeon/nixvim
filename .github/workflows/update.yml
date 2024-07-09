@@ -74,7 +74,6 @@ jobs:
           # Can also use body-path if it's easier to generate a file
           # body: |
           team-reviewers: |
-            nix-community/nixvim
 
       - name: Print summary
         if: ${{ steps.pr.outputs.pull-request-number }}
