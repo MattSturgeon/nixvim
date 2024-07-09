@@ -61,7 +61,6 @@ jobs:
         id: pr
         uses: peter-evans/create-pull-request@v6
         with:
-          git-token: ${{ github.token }}
           branch: update/${{ matrix.branch }}
           base: ${{ matrix.branch }}
           delete-branch: true
