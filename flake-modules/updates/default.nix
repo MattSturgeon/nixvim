@@ -8,6 +8,7 @@
         text = ''
           repo_root=$(git rev-parse --show-toplevel)
           generated_dir=$repo_root/generated
+          mkdir -p "$generated_dir"
 
           echo "Rust-Analyzer"
           nix build .#rust-analyzer-options
