@@ -37,6 +37,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ssh-key: ${{ secrets.UPDATE_CI_KEY }}
           ref: ${{ matrix.branch }}
 
       - name: Install Nix
