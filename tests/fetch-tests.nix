@@ -1,5 +1,4 @@
 {
-  root,
   lib,
   pkgs,
   helpers,
@@ -51,4 +50,4 @@ let
     ];
 in
 # A list of the form [ { name = "..."; modules = [ /* test case modules */ ]; } ]
-fetchTests root [ ]
+root: fetchTests root [ ]

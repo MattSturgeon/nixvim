@@ -44,6 +44,23 @@
         maintainers = import ../tests/maintainers.nix { inherit pkgs; };
 
         generated = pkgs.callPackage ../tests/generated.nix { };
-      } // import ../tests { inherit pkgs pkgsUnfree helpers; };
+
+        tests =
+          pkgs.runCommandNoCCLocal "tests"
+            {
+              testsSrc = ../tests;
+              testList =
+                builtins.attrNames
+                  (import ../tests { inherit pkgs pkgsUnfree helpers; }).passthru.entries;
+              nativeBuildInputs = [ pkgs.nix ];
+            }
+            ''
+              for name in $testList; do
+                echo "Building $name"
+                nix-build "$testsSrc" --attr "passthru.entries.$name"
+              done
+              touch $out
+            '';
+      };
     };
 }

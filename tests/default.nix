@@ -1,13 +1,28 @@
 {
+  # By default, import nixpkgs from flake.lock
+  nixpkgs ?
+    let
+      json = builtins.fromJSON (builtins.readFile ../flake.lock);
+      lock = json.nodes.nixpkgs.locked;
+    in
+    fetchTarball {
+      url =
+        assert lock.type == "github";
+        "https://github.com/${lock.owner}/${lock.repo}/archive/${lock.rev}.tar.gz";
+      sha256 = lock.narHash;
+    },
+  pkgs ? import nixpkgs { },
+  pkgsUnfree ? import nixpkgs { config.allowUnfree = true; },
   lib ? pkgs.lib,
-  helpers,
-  pkgs,
-  pkgsUnfree,
+  helpers ? import ../lib/helpers.nix {
+    inherit pkgs lib;
+    _nixvimTests = true;
+  },
+  mkTestDerivationFromNixvimModule ?
+    (import ../lib/tests.nix { inherit pkgs lib; }).mkTestDerivationFromNixvimModule,
 }:
 let
-  fetchTests = import ./fetch-tests.nix;
-  test-derivation = import ../lib/tests.nix { inherit pkgs lib; };
-  inherit (test-derivation) mkTestDerivationFromNixvimModule;
+  fetchTests = import ./fetch-tests.nix { inherit pkgs lib helpers; };
 
   mkTest =
     { name, module }:
@@ -20,10 +35,7 @@ let
     };
 
   # List of files containing configurations
-  testFiles = fetchTests {
-    inherit lib pkgs helpers;
-    root = ./test-sources;
-  };
+  testFiles = fetchTests ./test-sources;
 
   exampleFiles = {
     name = "examples";
@@ -51,12 +63,5 @@ lib.pipe (testFiles ++ [ exampleFiles ]) [
     inherit (file) name;
     path = pkgs.linkFarm file.name (builtins.map mkTest file.modules);
   }))
-  (helpers.groupListBySize 10)
-  (lib.imap1 (
-    i: group: rec {
-      name = "test-${toString i}";
-      value = pkgs.linkFarm name group;
-    }
-  ))
-  builtins.listToAttrs
+  (pkgs.linkFarm "tests")
 ]
