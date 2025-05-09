@@ -5,6 +5,7 @@ parentOptions:
   lib,
   name,
   config,
+  pageStack,
   ...
 }:
 let
@@ -29,10 +30,12 @@ in
   options = {
     target = lib.mkOption {
       type = lib.types.str;
-      default = name;
-      defaultText = lib.literalMD "the attribute name";
+      # TODO: escape path elements and/or add `.md` to the end (?)
+      # TODO: set to "" when there is no page being rendered
+      default = lib.concatStringsSep "/" pageStack;
+      defaultText = lib.literalMD "the attribute path coerced to a filepath";
       description = ''
-        The page's file name.
+        The page's file name, i.e. the menu target.
       '';
     };
     title = lib.mkOption {
@@ -79,7 +82,17 @@ in
     };
     # Recursive sub-submodule
     pages = lib.mkOption {
-      type = lib.types.attrsOf (lib.types.submodule (lib.modules.importApply ./page.nix config.options));
+      type = lib.types.attrsOf (
+        lib.types.submodule [
+          (lib.modules.importApply ./page.nix config.options)
+          (
+            { name, ... }:
+            {
+              _module.args.pageStack = pageStack ++ [ name ];
+            }
+          )
+        ]
+      );
       default = { };
       description = ''
         Set of sub-pages nested below this page.
@@ -113,6 +126,7 @@ in
   };
 
   config = {
+    _module.args.pageStack = lib.mkDefault [ name ];
     options = lib.mkIf (optionPredicate != null) (builtins.filter optionPredicate parentOptions);
   };
 }

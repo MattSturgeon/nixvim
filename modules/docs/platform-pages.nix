@@ -56,5 +56,7 @@ in
   };
 
   # Define a menu section for platforms
-  meta.menuSections.platforms = { };
+  meta.menuSections.platforms = {
+    order = 500;
+  };
 }
