@@ -14,7 +14,7 @@ in
     ) [ ] (readDir by-name);
 
   # Declare plugins and colorschemes pages
-  config.meta.pages = genAttrs [ "plugins" "colorschemes" ] (set: {
+  config.meta.pages.options.pages = genAttrs [ "plugins" "colorschemes" ] (set: {
     optionPredicate = opt: lib.lists.hasPrefix [ set ] opt.loc;
 
     # Declare separate sub-pages for each plugin
