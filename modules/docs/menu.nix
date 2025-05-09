@@ -53,4 +53,7 @@
         ++ builtins.concatMap (pageToLines (indent + "  ") page) (builtins.attrValues page.pages);
     in
     lib.mkMerge (builtins.concatMap sectionToLines sortedSections);
+
+  # Add the menu to the markdown source
+  config.docs.src."SUMMARY.md".text = config.docs.menu;
 }
