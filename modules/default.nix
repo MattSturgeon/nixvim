@@ -4,6 +4,7 @@
 # using this in a submodule nested within another nixvim config.
 {
   imports = [
+    ./docs
     ./lsp
     ./misc
     ./autocmd.nix
