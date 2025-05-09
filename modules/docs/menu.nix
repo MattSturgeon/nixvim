@@ -40,13 +40,17 @@
         lib.optionals (pages != [ ]) (
           [ "# ${section.title}" ]
           ++ [ "" ] # Blank line
-          ++ builtins.concatMap (pageToLines "") pages
+          ++ builtins.concatMap (pageToLines "" null) pages
           ++ [ "" ] # Blank line
         );
       pageToLines =
-        indent: page:
-        [ "${indent}- [${page.title}](${page.target})" ]
-        ++ builtins.concatMap (pageToLines (indent + "  ")) (builtins.attrValues page.pages);
+        indent: parent: page:
+        let
+          prefix = lib.optionalString (parent ? title) (parent.title + ".");
+          title = lib.strings.removePrefix prefix page.title;
+        in
+        [ "${indent}- [${title}](${page.target})" ]
+        ++ builtins.concatMap (pageToLines (indent + "  ") page) (builtins.attrValues page.pages);
     in
     lib.mkMerge (builtins.concatMap sectionToLines sortedSections);
 }
