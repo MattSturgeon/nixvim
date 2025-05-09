@@ -1,11 +1,10 @@
 # Module implementing the `meta.page` submodule
-# Usage: lib.modules.importApply ./page.nix docOptionTemplates
-parentOptions:
 {
   lib,
-  name,
   config,
   pageStack,
+  parentOptions,
+  renderMarkdown,
   ...
 }:
 let
@@ -84,11 +83,14 @@ in
     pages = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule [
-          (lib.modules.importApply ./page.nix config.options)
+          ./page.nix
           (
             { name, ... }:
             {
-              _module.args.pageStack = pageStack ++ [ name ];
+              _module.args = {
+                pageStack = pageStack ++ [ name ];
+                parentOptions = config.options;
+              };
             }
           )
         ]
@@ -126,7 +128,6 @@ in
   };
 
   config = {
-    _module.args.pageStack = lib.mkDefault [ name ];
     options = lib.mkIf (optionPredicate != null) (builtins.filter optionPredicate parentOptions);
   };
 }

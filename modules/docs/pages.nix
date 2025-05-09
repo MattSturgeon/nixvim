@@ -20,9 +20,14 @@ in
   options.meta.pages = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule [
-        (lib.modules.importApply ./page.nix docOptions)
+        ./page.nix
         (
-          { lib, config, ... }:
+          {
+            lib,
+            name,
+            config,
+            ...
+          }:
           {
             options.menuSection = lib.mkOption {
               type = menuSectionType;
@@ -33,6 +38,11 @@ in
               description = ''
                 The name of the menu section where this page should go.
               '';
+            };
+
+            config._module.args = {
+              pageStack = [ name ];
+              parentOptions = docOptions;
             };
           }
         )
