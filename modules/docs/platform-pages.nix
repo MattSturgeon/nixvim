@@ -32,6 +32,7 @@ in
     title = "Platform-specific options";
     showTitleOnPage = false;
     source = ../../docs/platforms/index.md;
+    menuSection = "platforms";
 
     pages = {
       "nixos" = mkPlatformPage {
@@ -53,4 +54,7 @@ in
       };
     };
   };
+
+  # Define a menu section for platforms
+  meta.menuSections.platforms = { };
 }
