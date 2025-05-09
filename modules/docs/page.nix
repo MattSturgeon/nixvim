@@ -12,9 +12,16 @@ let
     optionPredicate
     ;
 
-  # TODO:
-  # childHasOption = opt: builtins.any (page: builtins.elem opt page.options) config.pages;
-  # optionsOnThisPage = builtins.filter (opt: !childHasOption opt) config.options;
+  drvName = lib.replaceStrings [ "/" ] [ "-" ] config.target;
+
+  preamble = lib.concatMapStrings (para: para + "\n\n") (
+    lib.optional (config.showTitleOnPage && config.title != "") config.title
+    ++ lib.optional (config.text != null) config.text
+  );
+
+  childHasOption =
+    opt: builtins.any (page: builtins.elem opt page.options) (builtins.attrValues config.pages);
+  optionsOnThisPage = builtins.filter (opt: !childHasOption opt) config.options;
 
   commonOptionLoc =
     let
@@ -90,6 +97,7 @@ in
               _module.args = {
                 pageStack = pageStack ++ [ name ];
                 parentOptions = config.options;
+                inherit renderMarkdown;
               };
             }
           )
@@ -125,9 +133,50 @@ in
       '';
       internal = true;
     };
+    optionsJSON = lib.mkOption {
+      type = with lib.types; nullOr path;
+      default = null;
+      description = ''
+        `options.json` file, as expected by `nixos-render-docs`.
+      '';
+      internal = true;
+    };
+    markdown = lib.mkOption {
+      type = with lib.types; nullOr path;
+      default = null;
+      description = ''
+        Markdown render of this page.
+      '';
+      internal = true;
+    };
   };
 
   config = {
     options = lib.mkIf (optionPredicate != null) (builtins.filter optionPredicate parentOptions);
+    optionsJSON = lib.mkIf (optionsOnThisPage != [ ]) (
+      lib.pipe optionsOnThisPage [
+        (builtins.map (opt: {
+          inherit (opt) name;
+          value = builtins.removeAttrs opt [
+            "name"
+            "visible"
+            "internal"
+          ];
+        }))
+        builtins.listToAttrs
+        builtins.toJSON
+        builtins.unsafeDiscardStringContext
+        (builtins.toFile "options-${drvName}.json")
+      ]
+    );
+    markdown =
+      if preamble == "" && optionsOnThisPage == [ ] then
+        lib.mkIf (config.source != null) config.source
+      else
+        renderMarkdown {
+          name = drvName;
+          text = preamble;
+          inherit (config) source optionsJSON;
+        };
   };
 }

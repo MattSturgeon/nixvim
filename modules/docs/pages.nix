@@ -2,6 +2,7 @@
   lib,
   config,
   options,
+  pkgs,
   ...
 }:
 let
@@ -43,6 +44,7 @@ in
             config._module.args = {
               pageStack = [ name ];
               parentOptions = docOptions;
+              renderMarkdown = pkgs.callPackage ./render-page-md.nix;
             };
           }
         )
