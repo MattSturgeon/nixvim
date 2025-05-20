@@ -6,62 +6,38 @@
   writers,
   nixdoc,
   nixvim,
-  pageSpecs ? import ./pages.nix,
+  pageSpecs ? ./pages.nix,
 }:
 
 let
-  # Some pages are just menu entries, others have an actual markdown page that
-  # needs rendering.
-  shouldRenderPage = page: page ? file || page ? markdown;
-
-  # Normalise a page node, recursively normalise its children
-  elaboratePage =
-    loc:
-    {
-      title ? "",
-      markdown ? null,
-      file ? null,
-      pages ? { },
-    }@page:
-    {
-      name = lib.attrsets.showAttrPath loc;
-      loc = lib.throwIfNot (
-        builtins.head loc == "lib"
-      ) "All pages must be within `lib`, unexpected root `${builtins.head loc}`" (builtins.tail loc);
-    }
-    // lib.optionalAttrs (shouldRenderPage page) {
-      inherit
-        file
-        title
-        ;
-      markdown =
-        if builtins.isString markdown then
-          builtins.toFile "${lib.strings.replaceStrings [ "/" "-" ] (lib.lists.last loc)}.md" markdown
-        else
-          markdown;
-      outFile = lib.strings.concatStringsSep "/" (loc ++ [ "index.md" ]);
-    }
-    // lib.optionalAttrs (page ? pages) {
-      pages = elaboratePages loc pages;
-    };
-
-  # Recursively normalise page nodes
-  elaboratePages = prefix: builtins.mapAttrs (name: elaboratePage (prefix ++ [ name ]));
+  pageConfiguration = lib.evalModules {
+    modules = [
+      pageSpecs
+      {
+        freeformType = lib.types.attrsOf (
+          lib.types.submoduleWith {
+            modules = [ ../modules/page.nix ];
+          }
+        );
+      }
+    ];
+  };
+  pages = pageConfiguration.config;
 
   # Collect all page nodes into a list of page entries
   collectPages =
     pages:
     builtins.concatMap (
-      page:
-      [ (builtins.removeAttrs page [ "pages" ]) ]
-      ++ lib.optionals (page ? pages) (collectPages page.pages)
+      node:
+      let
+        children = builtins.removeAttrs node [ "_page" ];
+      in
+      lib.optional (node ? _page) node._page ++ lib.optionals (children != { }) (collectPages children)
     ) (builtins.attrValues pages);
 
   # Normalised page specs
-  elaboratedPageSpecs = elaboratePages [ ] pageSpecs;
-  pageList = collectPages elaboratedPageSpecs;
-  pagesToRender = builtins.filter (page: page ? outFile) pageList;
-  pagesWithFunctions = builtins.filter (page: page.file or null != null) pageList;
+  pageList = collectPages pages;
+  pagesToRender = builtins.filter (page: page.hasContent) pageList;
 in
 
 runCommand "nixvim-lib-docs"
@@ -75,24 +51,22 @@ runCommand "nixvim-lib-docs"
         inherit lib;
         rootPath = nixvim;
         functionSet = lib.extend nixvim.lib.overlay;
-        pathsToScan = builtins.catAttrs "loc" pagesWithFunctions;
+        pathsToScan = lib.pipe pageList [
+          (builtins.catAttrs "libLoc")
+          (builtins.filter (loc: loc != null))
+        ];
         revision = nixvim.rev or "main";
       }
     );
 
+    passthru.config = pageConfiguration;
+
     passthru.menu = import ./menu.nix {
-      inherit lib;
-      pageSpecs = elaboratedPageSpecs;
+      inherit lib pages;
     };
 
     passthru.pages = builtins.listToAttrs (
-      builtins.map (
-        { name, outFile, ... }:
-        {
-          inherit name;
-          value = outFile;
-        }
-      ) pagesToRender
+      builtins.map ({ title, target, ... }: lib.nameValuePair title target) pagesToRender
     );
   }
   ''
@@ -100,7 +74,7 @@ runCommand "nixvim-lib-docs"
       md_file="$1"
       in_file="$2"
       name="$3"
-      out_file="$out/$4"
+      out_file="$out/$4/index.md"
       title="$5"
 
       if [[ -z "$in_file" ]]; then
@@ -121,7 +95,7 @@ runCommand "nixvim-lib-docs"
           --locs "$locations" \
           --category "$name" \
           --description "REMOVED BY TAIL" \
-          --prefix "" \
+          --prefix "lib" \
           --anchor-prefix "" \
         | tail --lines +2 \
         > functions.md
@@ -159,19 +133,19 @@ runCommand "nixvim-lib-docs"
 
     ${lib.concatMapStringsSep "\n" (
       {
-        name,
-        file,
-        markdown,
-        outFile,
+        libLoc,
+        libFile,
+        source,
+        target,
         title ? "",
         ...
       }:
       lib.escapeShellArgs [
         "docgen"
-        "${lib.optionalString (markdown != null) markdown}" # md_file
-        "${lib.optionalString (file != null) file}" # in_file
-        name # name
-        outFile # out_file
+        "${lib.optionalString (source != null) source}" # md_file
+        "${lib.optionalString (libFile != null) libFile}" # in_file
+        (lib.optionalString (libLoc != null) (lib.showAttrPath libLoc)) # name
+        target # out_file
         title # title
       ]
     ) pagesToRender}
