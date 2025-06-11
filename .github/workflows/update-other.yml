@@ -1,5 +1,6 @@
 name: Schedule update for other branches
 on:
+  workflow_dispatch:
   # Runs every Saturday at noon
   schedule:
     - cron: "0 12 * * SAT"
@@ -12,7 +13,6 @@ jobs:
   prepare:
     name: Compute list of branches
     runs-on: ubuntu-24.04-arm
-    if: github.repository == 'nix-community/nixvim'
     outputs:
       branches: ${{ steps.list-branches.outputs.result }}
     steps:
