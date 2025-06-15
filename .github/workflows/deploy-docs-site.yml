@@ -1,4 +1,4 @@
-name: Deploy website
+name: Documentation
 
 on:
   # TODO: Consider running on schedule instead of on push
@@ -15,46 +15,68 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ matrix.name }}
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
     strategy:
       fail-fast: true
       matrix:
         # TODO: generate matrix from version-info.toml
         include:
-          - name: main
+          - name: unstable
             ref: main
-            baseHref: /nixvim/
+            sub-path: ""
+            base-href: /nixvim/
           - name: "25.05"
             ref: nixos-25.05
-            baseHref: /nixvim/25.05/
+            sub-path: "25.05"
+            base-href: /nixvim/25.05/
           - name: "24.11"
             ref: nixos-24.11
-            baseHref: /nixvim/24.11/
-    uses: ./.github/workflows/build-docs.yml
-    secrets: inherit
-    with:
-      name: ${{ matrix.name }}-docs
-      ref: ${{ matrix.ref }}
-      baseHref: ${{ matrix.baseHref }}
-      # TODO: generate JSON from version-info.toml
-      versions: >
-        [
-          {
-            "branch": "main",
-            "nixpkgsBranch": "nixos-unstable",
-            "baseHref": "/nixvim/"
-          },
-          {
-            "branch": "nixos-25.05",
-            "nixpkgsBranch": "nixos-25.05",
-            "baseHref": "/nixvim/25.05/"
-          },
-          {
-            "branch": "nixos-24.11",
-            "nixpkgsBranch": "nixos-24.11",
-            "baseHref": "/nixvim/24.11/"
-          }
-        ]
+            sub-path: "24.11"
+            base-href: /nixvim/24.11/
+
+    steps:
+      - name: Install nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Configure cachix
+        uses: cachix/cachix-action@v16
+        with:
+          name: nix-community
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+        # Uses the build-docs action from the checked-out nixvim branch
+      - name: Build docs
+        uses: ./.github/actions/build-docs
+        with:
+          artifact-name: ${{ matrix.name }}-docs
+          sub-path: ${{ matrix.sub-path }}
+          base-href: ${{ matrix.base-href }}
+          # TODO: generate JSON from version-info.toml
+          versions: >
+            [
+              {
+                "branch": "main",
+                "nixpkgsBranch": "nixos-unstable",
+                "baseHref": "/nixvim/"
+              },
+              {
+                "branch": "nixos-25.05",
+                "nixpkgsBranch": "nixos-25.05",
+                "baseHref": "/nixvim/25.05/"
+              },
+              {
+                "branch": "nixos-24.11",
+                "nixpkgsBranch": "nixos-24.11",
+                "baseHref": "/nixvim/24.11/"
+              }
+            ]
 
   combine:
     name: Combine builds
@@ -73,26 +95,24 @@ jobs:
           pattern: "*-docs"
           merge-multiple: false
 
-      - name: Coerce directory structure
+      - name: Extract archives
         working-directory: result
         run: |
-          for old in *
+          for archive in */archive.tar
           do
-            new=${old%"-docs"}
-            if [ "$new" = "main" ]
-            then
-              mv "$old/"* .
-              rmdir "$old"
-            elif [ "$old" != "$new" ]
-            then
-              mv "$old" "$new"
-            fi
+            echo "$archive" >> files
           done
+          mkdir -p combined
+          parallel \
+              tar --extract \
+                  --file "$archive" \
+                  --directory combined \
+              < files
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: result
+          path: combined
 
   deploy:
     name: Deploy

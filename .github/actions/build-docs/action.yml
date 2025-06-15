@@ -1,0 +1,74 @@
+name: Build Documentation
+description: >
+  Build Nixvim's documentation and upload an artifact.
+
+  Requires having nix installed and Nixvim checked out.
+
+inputs:
+  sub-path:
+    description: Move the docs to this sub-directory path.
+    default: ""
+  base-href:
+    description: The base href to use when building the docs.
+    default: /nixvim/
+  versions:
+    description: JSON array describing Nixvim versions to be linked in the docs.
+    default: "[]"
+  artifact-name:
+    description: Artifact name.
+    default: docs
+  retention-days:
+    description: Days after which artifact will expire.
+    default: "1"
+
+outputs:
+  artifact-id:
+    description: The ID of the artifact that was uploaded.
+    value: ${{ steps.upload.outputs.artifact-id }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: nix-build
+      shell: bash
+      env:
+        baseHref: ${{ inputs.base-href }}
+        versions: ${{ inputs.versions }}
+      run: |
+        nix-build \
+            --argstr baseHref "$baseHref" \
+            --argstr versionsJson "$versions" \
+            --expr '
+              {
+                baseHref,
+                versionsJson,
+                system ? builtins.currentSystem,
+              }:
+              let
+                # Import flake using flake-compat
+                flake = import ./.;
+                inherit (flake.outputs.packages.${system}) docs;
+              in
+              docs.override {
+                inherit baseHref;
+                availableVersions = builtins.fromJSON versionsJson;
+              }
+            '
+
+    - name: Move to sub-path
+      if: inputs.sub-path
+      shell: bash
+      env:
+        path: ${{ inputs.sub-path }}
+      run: |
+        mv -T result _result
+        mkdir -p "result/$path"
+        mv -fT _result "result/$path"
+
+    - name: Upload artifact
+      id: upload
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: result
+        name: ${{ inputs.artifact-name }}
+        retention-days: ${{ inputs.retention-days }}
