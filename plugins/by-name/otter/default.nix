@@ -114,6 +114,10 @@ lib.nixvim.plugins.mkNeovimPlugin {
     plugins.lsp.onAttach = lib.mkIf cfg.autoActivate ''
       require('otter').activate()
     '';
+
+    lsp.onAttach = lib.mkIf cfg.autoActivate ''
+      require('otter').activate()
+    '';
   };
 
 }
