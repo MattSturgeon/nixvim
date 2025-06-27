@@ -1,0 +1,61 @@
+name: Documentation
+
+on:
+  pull_request_target:
+    branches:
+      - main
+
+# Allow one concurrent deployment per PR
+concurrency:
+  group: preview-docs-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Configure cachix
+        uses: cachix/cachix-action@v16
+        with:
+          name: nix-community
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+        # Uses the build-docs action from the checked-out nixvim branch
+        # FIXME: is this secure? We just checked out the _user's_ branch...
+        # TODO: also sparse-checkout .github/actions from the main branch
+      - name: Build docs
+        uses: ./.github/actions/build-docs
+        with:
+          artifact-name: github-pages
+          base-href: # TODO: set this to the preview path
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-24.04-arm
+    needs: build
+
+    permissions:
+      pages: write # to deploy to Pages
+      id-token: write # to verify the deployment originates from an appropriate source
+
+    environment:
+      name: github-pages-preview
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          preview: ${{ github.event_name == 'pull_request_target' }}
