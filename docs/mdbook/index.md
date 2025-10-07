@@ -1,5 +1,7 @@
 # NixVim - A Neovim configuration system for nix
 
+Testing Testing 123
+
 ## Other versions of these docs
 
 Please ensure you are referencing documentation that corresponds to the Nixvim version you are using!
