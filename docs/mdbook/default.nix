@@ -7,6 +7,7 @@ let
     if value == "" then fallback else value;
 in
 # NOTE: to use defaults from the environment, you must build using --impure
+# This is used in CI to inject impure baseHref and availableVersions values
 {
   pkgs,
   callPackage,
