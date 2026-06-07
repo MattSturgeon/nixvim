@@ -1,3 +1,12 @@
+let
+  getEnvOr =
+    name: fallback:
+    let
+      value = builtins.getEnv name;
+    in
+    if value == "" then fallback else value;
+in
+# NOTE: to use defaults from the environment, you must build using --impure
 {
   pkgs,
   callPackage,
@@ -9,10 +18,10 @@
   search,
   lib-docs,
   # The root directory of the site
-  baseHref ? "/",
+  baseHref ? getEnvOr "NIXVIM_DOCS_BASE_HREF" "/",
   # A list of all available docs that should be linked to
   # Each element should contain { branch; nixpkgsBranch; baseHref; status; }
-  availableVersions ? [ ],
+  availableVersions ? builtins.fromJSON (getEnvOr "NIXVIM_DOCS_AVAILABLE_VERSIONS" "[]"),
 }:
 let
   inherit (configuration.config.meta) nixvimInfo;
