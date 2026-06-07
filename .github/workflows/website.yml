@@ -96,19 +96,45 @@ jobs:
           name: nix-community
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
+      # --apply can be used with `nix eval`, but there's no way to build the result.
+      # Therefore, we build a downstream flake taking the Nixvim branch as its input
+      - name: Setup flake
+        env:
           ref: ${{ matrix.ref }}
+        run: |
+          cat > flake.nix <<EOF
+          {
+            inputs.nixvim.url = "";
+            outputs = inputs: {
+              packages.x86_64-linux.default = inputs.nixvim.packages.x86_64-linux.docs.override {
+                baseHref = builtins.getEnv "baseHref";
+                availableVersions = builtins.fromJSON (builtins.getEnv "availableVersions");
+              };
+            };
+          }
+          EOF
 
-        # Uses the build-docs action from the checked-out nixvim branch
+          git init --initial-branch=main
+          git add flake.nix
+          nix flake lock --override-input nixvim "github:$GITHUB_REPOSITORY/$ref"
+          git add flake.lock
+
+      # Build the `docs` flake output from the corresponding branch
+      # Uses --impure to allow `getEnv` in `.override`
       - name: Build docs
-        uses: ./.github/actions/build-docs
+        env:
+          outLink: build/${{ matrix.sub-path }}
+          baseHref: ${{ matrix.base-href }}
+          availableVersions: ${{ needs.prepare.outputs.versions }}
+        run: |
+          nix build --impure --out-link "$outLink"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
         with:
-          artifact-name: ${{ matrix.name }}-docs
-          sub-path: ${{ matrix.sub-path }}
-          base-href: ${{ matrix.base-href }}
-          versions: ${{ needs.prepare.outputs.versions }}
+          path: build
+          name: ${{ matrix.name }}-docs
+          retention-days: 1
 
   combine:
     name: Combine builds
